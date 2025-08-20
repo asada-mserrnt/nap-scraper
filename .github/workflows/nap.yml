@@ -1,0 +1,53 @@
+name: NAP daily scraper
+
+on:
+  schedule:
+    - cron: "10 23 * * *"   # JST 08:10（UTCで指定）
+  workflow_dispatch: {}      # 手動実行も可能
+
+permissions:
+  contents: write
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    env:
+      NAP_CAMPSITE_ID: ${{ secrets.NAP_CAMPSITE_ID }}
+      NAP_STAFF_ID:    ${{ secrets.NAP_STAFF_ID }}
+      NAP_PASSWORD:    ${{ secrets.NAP_PASSWORD }}
+
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Google Chrome
+        uses: browser-actions/setup-chrome@v1
+
+      - name: Install ChromeDriver
+        uses: nanasess/setup-chromedriver@v2
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run scraper (headless)
+        run: python napp_scraper.py
+
+      - name: Commit & push CSV
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/
+          git commit -m "data: update $(date -u +'%Y-%m-%dT%H:%M:%SZ')" || echo "No changes"
+          git push
+
+      # GASのシークレットが未設定なら、このステップは自動スキップ
+      - name: Trigger GAS import
+        if: ${{ secrets.GAS_WEBAPP_URL != '' && secrets.GAS_TOKEN != '' }}
+        run: curl -X POST "${{ secrets.GAS_WEBAPP_URL }}?token=${{ secrets.GAS_TOKEN }}"
