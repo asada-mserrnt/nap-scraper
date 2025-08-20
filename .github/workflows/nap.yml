@@ -2,7 +2,7 @@ name: NAP daily scraper
 
 on:
   schedule:
-    - cron: "10 23 * * *"   # JST 08:10（UTCで指定）
+    - cron: "10 23 * * *"   # JST 08:10（UTC指定）
   workflow_dispatch: {}      # 手動実行も可能
 
 permissions:
@@ -47,7 +47,10 @@ jobs:
           git commit -m "data: update $(date -u +'%Y-%m-%dT%H:%M:%SZ')" || echo "No changes"
           git push
 
-      # GASのシークレットが未設定なら、このステップは自動スキップ
       - name: Trigger GAS import
-        if: ${{ secrets.GAS_WEBAPP_URL != '' && secrets.GAS_TOKEN != '' }}
-        run: curl -X POST "${{ secrets.GAS_WEBAPP_URL }}?token=${{ secrets.GAS_TOKEN }}"
+        run: |
+          if [ -n "${{ secrets.GAS_WEBAPP_URL }}" ] && [ -n "${{ secrets.GAS_TOKEN }}" ]; then
+            curl -X POST "${{ secrets.GAS_WEBAPP_URL }}?token=${{ secrets.GAS_TOKEN }}"
+          else
+            echo "GAS_WEBAPP_URL or GAS_TOKEN not set; skipping."
+          fi
